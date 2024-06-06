@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: falco
+  namespace: falco
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    namespace: kcd
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  source:
+    repoURL: https://github.com/falcosecurity/charts.git
+    path: charts/falco
+    helm:
+      valuesObject:
+        tty: true
+        driver:
+          kind: modern_ebpf
+        falco:
+          rules_file:
+            - /etc/falco/falco_rules.yaml
+            - /etc/falco/falco-incubating_rules.yaml
+            - /etc/falco/falco-sandbox_rules.yaml
+            - /etc/falco/rules.d
+          webserver:
+            enabled: true
+            prometheus_metrics_enabled: true
+          metrics:
+            enabled: true
+            interval: 15m
+        extra:
+          env:
+            - name: FALCO_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+        falcosidekick:
+          enabled: true
+          replicaCount: 1
+          webui:
+            enabled: true
+            replicaCount: 1
+            redis:
+              storageEnabled: false
+            image:
+              tag: latest
+          config:
+            customfields: "event.name:kcd-czech-slovak"
+          ingress:
+            enabled: true
+            annotations:
+              kubernetes.io/ingress.class: nginx
+            hosts:
+              - host: falco.kcd.sikademo.com
+                paths:
+                  - path: /
+        falcoctl:
+          indexes:
+          - name: falcosecurity
+            url: https://falcosecurity.github.io/falcoctl/index.yaml
+          artifact:
+            install:
+              enabled: true
+            follow:
+              enabled: true
+          config:
+            artifact:
+              allowedTypes:
+                - rulesfile
+              install:
+                resolveDeps: false
+                refs: [falco-rules:latest, falco-incubating-rules:latest, falco-sandbox-rules:latest]
+              follow:
+                refs: [falco-rules:latest, falco-incubating-rules:latest, falco-sandbox-rules:latest]
