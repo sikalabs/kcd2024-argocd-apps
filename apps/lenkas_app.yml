@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lenkas-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    namespace: kcd
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+  source:
+    repoURL: https://github.com/kargerova/nginx-fastapi-docker.git
+    path: charts/app1
+    helm:
+      valuesObject:
+        image: kavini/app1
+        host: lenkas-app.kcd.sikademo.com
+        replicas: 2
